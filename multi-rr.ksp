@@ -1,0 +1,60 @@
+
+
+
+on init
+  declare %list[9]
+  declare $at := num_elements(%list)
+  declare $last
+  { %list is the order the groups will play, $at is the current position in the list. } 
+  { for any number of round robin groups other than 7, change the %list size. }
+
+  
+  declare $x
+
+  declare @debug { remove this and the debug section below after testing }
+end on
+
+on note
+  disallow_group($ALL_GROUPS)
+  
+  inc($at)
+  
+  { if all groups in the list have been played, fill the list with all groups in random }
+  { order, and make sure the last played group is not the first in the new list }
+  if($at >= num_elements(%list))
+  
+    { remember last played group }
+    $last := %list[num_elements(%list) - 1]
+    
+    { fill list with all groups in random order }
+    %list[0] := 0
+    $at := 1
+    while($at # num_elements(%list))
+      $x := random(0, $at)
+      %list[$at] := %list[$x]
+      %list[$x] := $at
+      inc($at)
+    end while
+    $at := 0
+    
+    { if the last played group is first in the new list, swap first and last in the list }
+    if(%list[0] = $last)
+      %list[0] := %list[num_elements(%list) - 1]
+      %list[num_elements(%list) - 1] := $last
+    end if
+    
+    { debug: show list }
+    $x := 0
+    @debug := "list:"
+    while($x # num_elements(%list))
+      @debug := @debug & " " & %list[$x]
+      inc($x)
+    end while
+    message(@debug)
+    { debug end }
+  
+  end if
+  
+  { enable a group from the list }
+  allow_group(%list[$at])
+end on
