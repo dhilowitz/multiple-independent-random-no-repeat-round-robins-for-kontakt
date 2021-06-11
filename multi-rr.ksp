@@ -1,8 +1,9 @@
-
-
-
 on init
-  { %groups is the groups for each round robin, $position is the current position in the list. } 
+  
+  { The %voiceX_groups arrays contain the group numbers for each individual round robin voice.  }
+  { You'll want to replace these group numbers with the IDs of the groups for each voice. }
+  { You'll also want to make sure you adjust the array size for each voice accordingly. }
+
   declare %voice1_groups[4] := (4,5,6,7)
   declare $voice1_position := num_elements(%voice1_groups)
   declare $voice1_last_position
@@ -15,6 +16,13 @@ on init
   declare $voice3_position := num_elements(%voice3_groups)
   declare $voice3_last_position
 
+  { You can have fewer than 3 round robin "voices" if you want. If you add more than 3, 
+    you will need to make more %voiceX variables following the same pattern as above. 
+    You will also need to add additional cases to the two select statements below (search 
+    for `select($current_voice)`) following the same patterns. For example, case 4 
+    would need to reference a new variables called voice4_groups, voice4_position, and 
+    voice_4last_position, respecitively.
+  }
   declare $num_voices := 3
 
   { temp variables }
@@ -31,10 +39,6 @@ on init
 
   message("")
 end on
-
-function func_play_note
-
-end function
 
 on note
   disallow_group($ALL_GROUPS)
