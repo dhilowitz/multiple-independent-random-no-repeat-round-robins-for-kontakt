@@ -2,14 +2,28 @@
 
 
 on init
-  declare %list[4] := (4,5,6,7)
-  declare $at := num_elements(%list)
-  declare $last
-  { %list is the order the groups will play, $at is the current position in the list. } 
-  { for any number of round robin groups other than 7, change the %list size. }
+  { %groups is the groups for each round robin, $position is the current position in the list. } 
+  declare %voice1_groups[4] := (4,5,6,7)
+  declare $voice1_position := num_elements(%voice1_groups)
+  declare $voice1_last_position
 
-  
+  declare %voice2_groups[2] := (1,2)
+  declare $voice2_position := num_elements(%voice2_groups)
+  declare $voice2_last_position
+
+  declare %voice3_groups[3] := (3,4,8)
+  declare $voice3_position := num_elements(%voice3_groups)
+  declare $voice3_last_position
+
+  declare $num_voices := 3
+
   { temp variables }
+
+  declare $current_voice := 0
+  declare $current_voice_num_groups
+  declare %current_voice_groups[100] 
+  declare $current_voice_position
+  declare $current_voice_last_position
   declare $x
   declare $y
 
@@ -18,48 +32,116 @@ on init
   message("")
 end on
 
+function func_play_note
+
+end function
+
 on note
   disallow_group($ALL_GROUPS)
   
-  inc($at)
-  
-  { if all groups in the list have been played, fill the list with all groups in random }
-  { order, and make sure the last played group is not the first in the new list }
-  if($at >= num_elements(%list))
-  
-    { remember last played group }
-    $last := %list[num_elements(%list) - 1]
+  $current_voice := 1
+  { this giant for (while) loop iterates through all of the groups and advances the round robin counters for all of the voices }
+  while($current_voice <= $num_voices)
+
+    { copy voice variables for the current voice to temp variables }
+    { this is what we have to do because there are no true multi-dimensional arrays}
+    $x := 0
+    select($current_voice)
+      case 1
+        $current_voice_position := $voice1_position
+        $current_voice_last_position := $voice1_last_position
+        $current_voice_num_groups := num_elements(%voice1_groups)
+        while($x < $current_voice_num_groups)
+          %current_voice_groups[$x] := %voice1_groups[$x]
+          inc($x)
+        end while
+      case 2
+        $current_voice_position := $voice2_position
+        $current_voice_last_position := $voice2_last_position
+        $current_voice_num_groups := num_elements(%voice2_groups)
+        while($x < $current_voice_num_groups)
+          %current_voice_groups[$x] := %voice2_groups[$x]
+          inc($x)
+        end while
+      case 3
+        $current_voice_position := $voice3_position
+        $current_voice_last_position := $voice3_last_position
+        $current_voice_num_groups := num_elements(%voice3_groups)
+        while($x < $current_voice_num_groups)
+          %current_voice_groups[$x] := %voice3_groups[$x]
+          inc($x)
+        end while
+    end select
+
+    { Round robin stuff }
+
+    inc($current_voice_position)
     
-    { fill list with all groups in random order }
-    { %list[0] := 0 }
-    $at := 1
-    while($at # num_elements(%list))
-      $x := random(0, $at)
-      $y := %list[$at]
-      %list[$at] := %list[$x]
-      %list[$x] := $y
-      inc($at)
-    end while
-    $at := 0
+    { if all groups in the list have been played, fill the list with all groups in random }
+    { order, and make sure the last played group is not the first in the new list }
+    if($current_voice_position >= $current_voice_num_groups)
     
-    { if the last played group is first in the new list, swap first and last in the list }
-    if(%list[0] = $last)
-      %list[0] := %list[num_elements(%list) - 1]
-      %list[num_elements(%list) - 1] := $last
+      { remember last played group }
+      $current_voice_last_position := %current_voice_groups[$current_voice_num_groups - 1]
+      
+      { fill list with all groups in random order }
+      { %groups[0] := 0 }
+      $current_voice_position := 1
+      while($current_voice_position # $current_voice_num_groups)
+        $x := random(0, $current_voice_position)
+        $y := %current_voice_groups[$current_voice_position]
+        %current_voice_groups[$current_voice_position] := %current_voice_groups[$x]
+        %current_voice_groups[$x] := $y
+        inc($current_voice_position)
+      end while
+      $current_voice_position := 0
+      
+      { if the last played group is first in the new list, swap first and last in the list }
+      if(%current_voice_groups[0] = $current_voice_last_position)
+        %current_voice_groups[0] := %current_voice_groups[$current_voice_num_groups - 1]
+        %current_voice_groups[$current_voice_num_groups - 1] := $current_voice_last_position
+      end if
+
+      { debug: show list }
+      $x := 0
+      @debug := "voice " & $current_voice & " at: " & $current_voice_position & "; list:"
+      while($x < $current_voice_num_groups)
+        @debug := @debug & " " & %current_voice_groups[$x]
+        inc($x)
+      end while
+      message(@debug)
+      { debug end }
     end if
     
-  end if
-  
-  { debug: show list }
-  $x := 0
-  @debug := "at: " & $at & "; list:"
-  while($x # num_elements(%list))
-    @debug := @debug & " " & %list[$x]
-    inc($x)
-  end while
-  message(@debug)
-  { debug end }
+    { enable a group from the list }
+    allow_group(%current_voice_groups[$current_voice_position])
 
-  { enable a group from the list }
-  allow_group(%list[$at])
+    { copy temp variables back to voice variables}
+    $x := 0
+    select($current_voice)
+      case 1
+        while($x < $current_voice_num_groups)
+          %voice1_groups[$x] := %current_voice_groups[$x]
+          inc($x)
+        end while
+        $voice1_position := $current_voice_position
+        $voice1_last_position := $current_voice_last_position
+      case 2
+        while($x < $current_voice_num_groups)
+          %voice2_groups[$x] := %current_voice_groups[$x]
+          inc($x)
+        end while
+        $voice2_position := $current_voice_position
+        $voice2_last_position := $current_voice_last_position
+      case 3
+        while($x < $current_voice_num_groups)
+          %voice3_groups[$x] := %current_voice_groups[$x]
+          inc($x)
+        end while
+        $voice3_position := $current_voice_position
+        $voice3_last_position := $current_voice_last_position
+    end select
+
+    inc($current_voice)
+  end while
 end on
