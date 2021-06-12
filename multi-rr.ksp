@@ -1,37 +1,55 @@
+
 on init
   
-  { The %voiceX_groups arrays contain the group numbers for each individual round robin voice.  }
-  { You'll want to replace these group numbers with the IDs of the groups for each voice. }
-  { You'll also want to make sure you adjust the array size for each voice accordingly. }
+  { This script was written by David Hilowitz, with advice from EvilDragon. } 
+  
+  { Assumptions: you will have a bunch of different groups. Each unique "set" of round robin groups will consist of a bunch of groups. }
 
-  declare %voice1_groups[4] := (4,5,6,7)
-  declare $voice1_position := num_elements(%voice1_groups)
-  declare $voice1_last_position
-
-  declare %voice2_groups[2] := (1,2)
-  declare $voice2_position := num_elements(%voice2_groups)
-  declare $voice2_last_position
-
-  declare %voice3_groups[3] := (3,4,8)
-  declare $voice3_position := num_elements(%voice3_groups)
-  declare $voice3_last_position
-
-  { You can have fewer than 3 round robin "voices" if you want. If you add more than 3, 
-    you will need to make more %voiceX variables following the same pattern as above. 
-    You will also need to add additional cases to the two select statements below (search 
-    for `select($current_voice)`) following the same patterns. For example, case 4 
-    would need to reference a new variables called voice4_groups, voice4_position, and 
-    voice_4last_position, respecitively.
+  { 
+    CONFIGURATION
+    The three variables below are the ones that you will need to configure your round robins. 
   }
-  declare $num_voices := 3
+  { The number of independent round robin sets the engine should track. }
+  declare const $NUM_SETS := 3
+  { 
+   The maximum number of round robins. In other words, the number of round robins in the set 
+   that contains the most different groups. 
+  }
+  declare const $MAX_RR := 5
+  
+  { 
+    The actual round robin groups. This multi-dimensional array variable contains the group IDs 
+    for each individual round robin set. You'll want to replace these group numbers with the IDs 
+    of the groups for each set. It's in a very particular format, so you'll want to study the example very carefully. Basically it's set up so that each line contains the group for a different "set" of
+    round robins that need to be tracked. There should be exactly the same number of "rows" in this multi-dimensional array as you put in your $NUM_SETS variable above. So if you have four sets of round robins, then you need to have four rows below. Since multi-dimensional arrays are perfectly rectangular, every line needs to have the same number of elements. Specifically, the number of elements in every line needs to match what you put in $MAX_RR above. That being said, you don't need to have that many round robins in each group. If you have fewer than the $MAX_RR round robins in a given set, fill the remainder of the line with -1s. 
+    
+    So, for example, if you have one round robin set that has four (4) groups, and two that have only three (3) 
+    groups, you would set your $MAX_RR to 4. Then, you would configure your array so that the first set has four 
+    groups specified. On the following two lines, you would specify the other two sets. Since each of those two sets only has three round robin groups, the final element in each line will be a -1:
 
-  { temp variables }
+    declare %round_robin_groups[$NUM_SETS * $MAX_RR] := (...
+     0,  1,  2,  3, -1, ...
+     4,  5, -1, -1, -1, ...
+     6,  7,  8, -1, -1)    
+   
+    Another thing to take of note of in the example above is the 
 
-  declare $current_voice := 0
-  declare $current_voice_num_groups
-  declare %current_voice_groups[100] 
-  declare $current_voice_position
-  declare $current_voice_last_position
+  } 
+  declare %round_robin_groups[$NUM_SETS * $MAX_RR] := (...
+     0,  1,  2,  3, -1,    { RR set #1}...
+     4,  5, -1, -1, -1,    { RR set #2}...
+     6,  7,  8, -1, -1)    { RR set #3}
+
+  { Temp variables. You should not need to modify any of these variables below. }
+
+  declare %set_position[$NUM_SETS] := (-1)
+  declare %set_last_position[$NUM_SETS] := (0)
+
+  declare $current_set := 0
+  declare $current_set_num_groups
+  declare %current_set_groups[$MAX_RR] 
+  declare $current_set_position
+  declare $current_set_last_position
   declare $x
   declare $y
 
@@ -43,74 +61,55 @@ end on
 on note
   disallow_group($ALL_GROUPS)
   
-  $current_voice := 1
-  { this giant for (while) loop iterates through all of the groups and advances the round robin counters for all of the voices }
-  while($current_voice <= $num_voices)
-
-    { copy voice variables for the current voice to temp variables }
-    { this is what we have to do because there are no true multi-dimensional arrays}
+  $current_set := 0
+  
+  { this giant for (while) loop iterates through all of the groups and advances the round robin counters for all of the sets }
+  while($current_set < $num_sets)
+  
+    { copy set variables for the current set to temp variables }
     $x := 0
-    select($current_voice)
-      case 1
-        $current_voice_position := $voice1_position
-        $current_voice_last_position := $voice1_last_position
-        $current_voice_num_groups := num_elements(%voice1_groups)
-        while($x < $current_voice_num_groups)
-          %current_voice_groups[$x] := %voice1_groups[$x]
-          inc($x)
-        end while
-      case 2
-        $current_voice_position := $voice2_position
-        $current_voice_last_position := $voice2_last_position
-        $current_voice_num_groups := num_elements(%voice2_groups)
-        while($x < $current_voice_num_groups)
-          %current_voice_groups[$x] := %voice2_groups[$x]
-          inc($x)
-        end while
-      case 3
-        $current_voice_position := $voice3_position
-        $current_voice_last_position := $voice3_last_position
-        $current_voice_num_groups := num_elements(%voice3_groups)
-        while($x < $current_voice_num_groups)
-          %current_voice_groups[$x] := %voice3_groups[$x]
-          inc($x)
-        end while
-    end select
+    while((%round_robin_groups[$current_set * $MAX_RR + $x] # -1) and ($current_set * $MAX_RR + $x < num_elements(%round_robin_groups)))  
+      %current_set_groups[$x] := %round_robin_groups[$current_set * $MAX_RR + $x]
+      inc($x)
+    end while
+    $current_set_num_groups := $x
+    $current_set_position := %set_position[$current_set]
+    $current_set_last_position := %set_last_position[$current_set]
 
     { Round robin stuff }
 
-    inc($current_voice_position)
+    inc($current_set_position)
     
     { if all groups in the list have been played, fill the list with all groups in random }
     { order, and make sure the last played group is not the first in the new list }
-    if($current_voice_position >= $current_voice_num_groups)
+    if($current_set_position >= $current_set_num_groups or $current_set_position = -1)
     
       { remember last played group }
-      $current_voice_last_position := %current_voice_groups[$current_voice_num_groups - 1]
+      $current_set_last_position := %current_set_groups[$current_set_num_groups - 1]
       
       { fill list with all groups in random order }
       { %groups[0] := 0 }
-      $current_voice_position := 1
-      while($current_voice_position # $current_voice_num_groups)
-        $x := random(0, $current_voice_position)
-        $y := %current_voice_groups[$current_voice_position]
-        %current_voice_groups[$current_voice_position] := %current_voice_groups[$x]
-        %current_voice_groups[$x] := $y
-        inc($current_voice_position)
+      $current_set_position := 1
+      while($current_set_position # $current_set_num_groups)
+        $x := random(0, $current_set_position)
+        $y := %current_set_groups[$current_set_position]
+        %current_set_groups[$current_set_position] := %current_set_groups[$x]
+        %current_set_groups[$x] := $y
+        inc($current_set_position)
       end while
-      $current_voice_position := 0
+      $current_set_position := 0
       
       { if the last played group is first in the new list, swap first and last in the list }
-      if(%current_voice_groups[0] = $current_voice_last_position)
-        %current_voice_groups[0] := %current_voice_groups[$current_voice_num_groups - 1]
-        %current_voice_groups[$current_voice_num_groups - 1] := $current_voice_last_position
+      if(%current_set_groups[0] = $current_set_last_position)
+        %current_set_groups[0] := %current_set_groups[$current_set_num_groups - 1]
+        %current_set_groups[$current_set_num_groups - 1] := $current_set_last_position
       end if
 
       { debug: show list }
       $x := 0
-      @debug := "voice " & $current_voice & " at: " & $current_voice_position & "; list:"
-      while($x < $current_voice_num_groups)
-        @debug := @debug & " " & %current_voice_groups[$x]
+      @debug := "RR Set " & ($current_set + 1) & "; Position: " & $current_set_position & "; Group list:"
+      while($x < $current_set_num_groups)
+        @debug := @debug & " " & %current_set_groups[$x]
         inc($x)
       end while
       message(@debug)
@@ -118,34 +117,17 @@ on note
     end if
     
     { enable a group from the list }
-    allow_group(%current_voice_groups[$current_voice_position])
+    allow_group(%current_set_groups[$current_set_position])
 
-    { copy temp variables back to voice variables}
+    { copy temp variables back to set variables}
     $x := 0
-    select($current_voice)
-      case 1
-        while($x < $current_voice_num_groups)
-          %voice1_groups[$x] := %current_voice_groups[$x]
-          inc($x)
-        end while
-        $voice1_position := $current_voice_position
-        $voice1_last_position := $current_voice_last_position
-      case 2
-        while($x < $current_voice_num_groups)
-          %voice2_groups[$x] := %current_voice_groups[$x]
-          inc($x)
-        end while
-        $voice2_position := $current_voice_position
-        $voice2_last_position := $current_voice_last_position
-      case 3
-        while($x < $current_voice_num_groups)
-          %voice3_groups[$x] := %current_voice_groups[$x]
-          inc($x)
-        end while
-        $voice3_position := $current_voice_position
-        $voice3_last_position := $current_voice_last_position
-    end select
+    while(($x < $current_set_num_groups) and ($current_set * $MAX_RR + $x < num_elements(%round_robin_groups)))  
+      %round_robin_groups[$current_set * $MAX_RR + $x] := %current_set_groups[$x]
+      inc($x)
+    end while
+    %set_position[$current_set] := $current_set_position
+    %set_last_position[$current_set] := $current_set_last_position
 
-    inc($current_voice)
+    inc($current_set)
   end while
 end on
